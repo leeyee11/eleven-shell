@@ -258,7 +258,7 @@ class Shell{
 	}
 	visit(page){
 		if(['music','markdown','lab','toys','profile'].indexOf(page)>=0){
-			window.location.href="./"+page+"/index.html";
+			window.location.href="/"+page;
 		}else{
 			this.error('no such page')
 		}
