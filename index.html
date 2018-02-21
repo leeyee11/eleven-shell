@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>LeeYee's Homepage</title>
+	<meta charset="utf-8"/>
+	<meta name="viewport" content="width=device-width,initial-scale=1.0, maximum-scale=1,user-scalable=no"/>
+	<link rel="stylesheet" type="text/css" href="./assets/css/homepage.css"/>
+</head>
+<body>
+	<div id="app" align="center">
+		<code>
+		</code>
+	</div>
+</body>
+</html>
+
+<script type="text/javascript" src="./assets/js/vfs.js"></script>
+<script type="text/javascript" src="./assets/js/particles.js"></script>
+<script type="text/javascript" src="./assets/js/shell.js"></script>
+<script type="text/javascript">
+	const app=document.getElementById('app');
+	const shell=new Shell(app);
+
+	shell.echo('----------------------------------');
+	shell.echo(''+new Date());
+	shell.echo('Welcome to LeeYee\'s homepage');
+	shell.echo('Type "help" to see more usages');
+	shell.echo('----------------------------------');
+	shell.exec('mkdir foo');
+	shell.exec('cd ./foo');
+	shell.exec('touch bar');
+	shell.exec('echo "hello world" > bar');
+	shell.exec('render bar');
+	shell.newLine();
+	
+	window.onload=()=>{
+		shell.particles.render();
+	}
+	window.onresize=()=>{
+		shell.particles.render();
+	}
+</script>
