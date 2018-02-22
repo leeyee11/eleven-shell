@@ -6,7 +6,7 @@ class Shell{
 		this.history=[];
 		this.historyPointer=null;
 		this.keywords=['ls','cd','cat','echo','help','clear','touch','render','visit'];
-		this.pages=['music','markdown','lab','toys','profile'];
+		this.pages=['music','markdown','lab','toys','ui','profile'];
 		this.particles=new Particles(app);
 
 	}
