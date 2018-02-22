@@ -147,7 +147,7 @@ class Shell{
 		this.echo(this.fs.getPath());
 	}
 	help(){
-		this.echo('visit\t[home|music|markdown|lab|toys|profile]');
+		this.echo('visit\t[home|music|markdown|lab|toys|ui|profile]');
 		this.echo('render\t[file]');
 		this.echo('echo\t[arg...]');
 		this.echo('touch\t[file]');
@@ -257,7 +257,7 @@ class Shell{
 		}
 	}
 	visit(page){
-		if(['music','markdown','lab','toys','profile'].indexOf(page)>=0){
+		if(this.pages.indexOf(page)>=0){
 			window.location.href="/"+page;
 		}else{
 			this.error('no such page')
