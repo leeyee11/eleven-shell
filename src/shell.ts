@@ -1,5 +1,24 @@
+interface VFSResponse{
+	code:number, //-1 for error; 0 for success;
+	message:string, //error message or request result;
+	result:Array<string>
+}	
+
 class Shell{
-	constructor(app){
+	//base property
+	private node:HTMLElement;
+	private fs:VFS;
+	private history:Array<string>;
+	private historyPointer:number;
+	private keywords:Array<string>;
+	private pages:Array<string>;
+	private particles:Particles;
+	private label:string;
+	//widget
+	private enterLine:any;//based on HTMLElement
+
+
+	constructor(app:HTMLElement){
 		this.node=document.createElement('code');
 		app.appendChild(this.node);
 		this.fs=new VFS();
@@ -8,9 +27,8 @@ class Shell{
 		this.keywords=['ls','cd','cat','echo','help','clear','touch','render','visit'];
 		this.pages=['music','markdown','lab','toys','ui','profile'];
 		this.particles=new Particles(app);
-
 	}
-	newLine(){
+	newLine():void{
 		const shell=this;
 		shell.enterLine=document.createElement('div');
 		shell.enterLine.style.position="relative";
@@ -21,7 +39,7 @@ class Shell{
 		shell.enterLine.input.spellcheck=false;
 		shell.enterLine.input.value="";
 		shell.enterLine.input.style.paddingLeft=(shell.fs.getPath()+' > ').length*9.6+"px";
-		shell.enterLine.input.onkeydown=function(e){
+		shell.enterLine.input.onkeydown=function(e:any){
 			if(e.key=='Enter'){
 				shell.history.push(shell.enterLine.input.value);
 				shell.historyPointer=shell.history.length;
@@ -64,7 +82,7 @@ class Shell{
 						}
 					}
 				}else if(shell.enterLine.input.value.split(' ').length>1){
-					const handler=shell.fs.ls();
+					const handler:VFSResponse=shell.fs.ls();
 					if(handler.code==0){
 						const list=handler.message;
 						for(let i of list){
@@ -79,7 +97,7 @@ class Shell{
 				}
 			}
 		}
-		shell.enterLine.input.oninput=function(e){
+		shell.enterLine.input.oninput=function(e:any){
 			if(shell.enterLine.input.value.length>=50){
 				shell.enterLine.input.value=shell.enterLine.input.value.slice(0,50);
 			}
@@ -89,8 +107,8 @@ class Shell{
 		shell.node.appendChild(shell.enterLine);
 		shell.enterLine.input.focus();
 	}
-	ls(path){
-		let dir;
+	ls(path:string):void{
+		let dir:string;
 		if(path&&path=="/"){
 			this.error("permission denied");
 			return;
@@ -105,10 +123,10 @@ class Shell{
 			//store currentDir
 			const currentDir=this.fs.getPath()
 			//cd target dir
-			const handler=this.fs.cd(dir);
+			const handler:VFSResponse=this.fs.cd(dir);
 			console.log("ls",dir);
 			if(handler.code==0){
-				const list=this.fs.ls().message;
+				const list=this.fs.ls().result;
 				let str="";
 				for(let i of list){
 					str+=i+" ";
@@ -129,24 +147,24 @@ class Shell{
 		}			
 
 	}
-	cd(path){
+	cd(path:string):void{
 		//if path == null
 		if(!path){
 			path='~';
 		}
 		//if path end width '/'
 		if(path[path.length-1]=="/"){
-			path.length=path.length-1;
+			path.slice(0,path.length-1)
 		}
-		const handler=this.fs.cd(path);
+		const handler:VFSResponse=this.fs.cd(path);
 		if(handler.code<0){
 			this.error(handler.message);
 		}
 	}
-	pwd(){
+	pwd():void{
 		this.echo(this.fs.getPath());
 	}
-	help(){
+	help():void{
 		this.echo('visit\t[home|music|markdown|lab|toys|ui|profile]');
 		this.echo('render\t[file]');
 		this.echo('echo\t[arg...]');
@@ -158,7 +176,7 @@ class Shell{
 		this.echo('pwd\t')
 		this.echo('ls\t');
 	}
-	cat(path){
+	cat(path:string):void{
 		let handler;
 		if(path.lastIndexOf('/')==-1){
 			const fileName=path;
@@ -181,18 +199,18 @@ class Shell{
 		}
 
 		if(handler.code==0){
-			this.echo(handler.message);
+			this.echo(handler.result[0]);
 		}else if(handler.code<0){
 			this.error(handler.message)
 		}
 	}
-	touch(fileName){
-		const handler=this.fs.touch(fileName);
+	touch(fileName:string):void{
+		const handler:VFSResponse=this.fs.touch(fileName);
 		if(handler.code<0){
 			this.error(handler.message);
 		}
 	}
-	mkdir(path){
+	mkdir(path:string):void{
 		let handler;
 		//if path end width '/'
 		if(path=="/"){
@@ -200,7 +218,7 @@ class Shell{
 			return;
 		}
 		if(path[path.length-1]=="/"){
-			path.length=path.length-1;
+			path.slice(0,path.length-1);
 		}
 		if(path.lastIndexOf('/')==-1){
 			const folderName=path;
@@ -225,11 +243,11 @@ class Shell{
 			this.error(handler.message);
 		}
 	}
-	clear(){
+	clear():void{
 		this.node.innerHTML="";
 		this.newLine();
 	}
-	echo(str){
+	echo(str:string):void{
 		const line=document.createElement('div');
 		if(str){
 			const words=str.split(' ');
@@ -244,29 +262,29 @@ class Shell{
 		}
 		this.node.insertBefore(line,this.enterLine);
 	}
-	write(str,target){
-		const handler=this.fs.write(str,target);
+	write(str:string,target:string):void{
+		const handler:VFSResponse=this.fs.write(str,target);
 		if(handler.code<0){
 			this.error(handler.message);
 		}
 	}
-	append(str,target){
-		const handler=this.fs.append(str,target);
+	append(str:string,target:string):void{
+		const handler:VFSResponse=this.fs.append(str,target);
 		if(handler.code<0){
 			this.error(handler.message);
 		}
 	}
-	visit(page){
+	visit(page:string):void{
 		if(this.pages.indexOf(page)>=0){
 			window.location.href="/"+page;
 		}else{
 			this.error('no such page')
 		}
 	}
-	error(err){
+	error(err:string):void{
 		this.echo(err);
 	}
-	render(path){
+	render(path:string):void{
 		let handler;
 		if(path.lastIndexOf('/')==-1){
 			const fileName=path;
@@ -289,13 +307,13 @@ class Shell{
 		}
 
 		if(handler.code==0){
-			this.particles.setText(handler.message);
+			this.particles.setText(handler.result[0]);
 			this.particles.render();
 		}else if(handler.code<0){
 			this.error(handler.message)
 		}
 	}
-	exec(command){
+	exec(command:string):void{
 		command.replace(/\s*/g,' ');
 		this.label=this.fs.getPath()+' > ';
 
