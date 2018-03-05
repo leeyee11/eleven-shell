@@ -254,7 +254,8 @@ var Shell = (function () {
     };
     Shell.prototype.visit = function (page) {
         if (this.pages.indexOf(page) >= 0) {
-            window.location.href = "/" + page;
+            var host = document.domain.split('.');
+            window.location.href = 'http://' + page + '.' + host[1] + '.' + host[2];
         }
         else {
             this.error('no such page');

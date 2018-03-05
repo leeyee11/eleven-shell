@@ -25,7 +25,7 @@ class Shell{
 		this.history=[];
 		this.historyPointer=null;
 		this.keywords=['ls','cd','cat','echo','help','clear','touch','render','visit'];
-		this.pages=['music','markdown','lab','toys','ui','profile'];
+		this.pages=['music','markdown','lab','toys','ui','resume'];
 		this.particles=new Particles(app);
 	}
 	newLine():void{
@@ -165,7 +165,7 @@ class Shell{
 		this.echo(this.fs.getPath());
 	}
 	help():void{
-		this.echo('visit\t[home|music|markdown|lab|toys|ui|profile]');
+		this.echo('visit\t[home|music|markdown|lab|toys|ui|resume]');
 		this.echo('render\t[file]');
 		this.echo('echo\t[arg...]');
 		this.echo('touch\t[file]');
@@ -276,7 +276,8 @@ class Shell{
 	}
 	visit(page:string):void{
 		if(this.pages.indexOf(page)>=0){
-			window.location.href="/"+page;
+			const host=document.domain.split('.'); 
+			window.location.href='http://'+page+'.'+host[1]+'.'+host[2];
 		}else{
 			this.error('no such page')
 		}
