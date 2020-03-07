@@ -121,4 +121,3 @@ class Particles {
   }
 }
 
-// export default Particles
