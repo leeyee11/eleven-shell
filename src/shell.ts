@@ -1,378 +1,470 @@
-interface VFSResponse{
-	code:number, //-1 for error; 0 for success;
-	message:string, //error message or request result;
-	result:Array<string>
-}	
+/**
+ * @param code -1 -> error 0 -> success
+ * @param message error message or request result
+ * @param result response body
+ */
+interface VFSResponse {
+	code: number,
+	message: string,
+	result: Array<string>
+}
 
-class Shell{
+class Shell {
 	//base property
-	private node:HTMLElement;
-	private fs:VFS;
-	private history:Array<string>;
-	private historyPointer:number;
-	private keywords:Array<string>;
-	private pages:Array<string>;
-	private particles:Particles;
-	private label:string;
+	private node: HTMLElement
+	private fs: VFS
+	private history: Array<string>
+	private historyPointer: number
+	private keywords: Array<string>
+	private pages: Array<string>
+	private particles: Particles
+	private input: HTMLDivElement
+	private cursor: number
+	private command: string
 	//widget
-	private enterLine:any;//based on HTMLElement
+	private enterLine: HTMLElement//based on HTMLElement
 
 
-	constructor(app:HTMLElement){
-		this.node=document.createElement('code');
-		app.appendChild(this.node);
-		this.fs=new VFS();
-		this.history=[];
-		this.historyPointer=null;
-		this.keywords=['ls','cd','cat','echo','help','clear','touch','render','visit'];
-		this.pages=['music','markdown','lab','toys','ui','resume'];
-		this.particles=new Particles(app);
+	constructor(app: HTMLElement) {
+		this.node = document.createElement('code')
+		app.appendChild(this.node)
+		this.fs = new VFS()
+		this.history = []
+		this.historyPointer = null
+		this.keywords = ['ls', 'cd', 'cat', 'echo', 'help', 'clear', 'touch', 'visit', 'mkdir', 'rm', 'render']
+		this.pages = ['music', 'markdown', 'lab', 'toys', 'ui', 'resume']
+		this.particles = new Particles(app)
 	}
-	newLine():void{
-		const shell=this;
-		shell.enterLine=document.createElement('div');
-		shell.enterLine.style.position="relative";
-		shell.enterLine.label=document.createElement('label');
-		shell.enterLine.label.innerHTML=shell.fs.getPath()+' > ';
-		shell.enterLine.label.style.position="absolute";
-		shell.enterLine.input=document.createElement('input');
-		shell.enterLine.input.spellcheck=false;
-		shell.enterLine.input.value="";
-		shell.enterLine.input.style.paddingLeft=(shell.fs.getPath()+' > ').length*9.6+"px";
-		shell.enterLine.input.onkeydown=function(e:any){
-			if(e.key=='Enter'){
-				shell.history.push(shell.enterLine.input.value);
-				shell.historyPointer=shell.history.length;
-				shell.exec(shell.enterLine.input.value);
-				shell.node.scrollTop=shell.node.scrollHeight;
-				shell.enterLine.input.value="";
-				shell.enterLine.label.innerHTML=shell.fs.getPath()+' > ';
-				shell.enterLine.input.style.paddingLeft=(shell.fs.getPath()+' > ').length*9.6+"px";
-				// shell.enterLine.outerHTML="";
-				// shell.newLine();
-
-			}else if(e.key=='ArrowUp'){
-				if(shell.historyPointer>0){
-					shell.enterLine.input.value=shell.history[--shell.historyPointer];
+	private renderCLI(): void {
+		const shell: Shell = this
+		const prefix: string = shell.fs.getPath() + ' > '
+		const labels: HTMLSpanElement[] = [...shell.command.split(''), ' ']
+			.map((char, i) => {
+				const span = document.createElement('span')
+				span.innerHTML = char === ' ' ? '&nbsp' : char
+				if (i === shell.cursor) {
+					span.style.background = "#acacac"
 				}
-			}else if(e.key=='ArrowDown'){
-				if(shell.historyPointer<shell.history.length-1){
-					shell.enterLine.input.value=shell.history[++shell.historyPointer];
-				}else{
-					if(shell.historyPointer<shell.history.length){
-						++shell.historyPointer;
-					}
-					shell.enterLine.input.value="";
-				}
-			}else if(e.key=='Tab'){
-				e.preventDefault();
+				return span
+			})
+		const preLabel: HTMLSpanElement = document.createElement('span')
+		preLabel.innerText = prefix
+		shell.input.innerHTML = null
+		shell.input.appendChild(preLabel)
+		labels.forEach(label => shell.input.append(label))
+	}
 
-				if(shell.enterLine.input.value.split(' ').length==1){
-					for(let kw of shell.keywords){
-						if(kw.indexOf(shell.enterLine.input.value)>=0){
-							shell.enterLine.input.value=kw;
-							break;
+	newLine(): void {
+		const shell: Shell = this
+
+		shell.enterLine = document.createElement('div')
+		shell.enterLine.style.position = "relative"
+
+		shell.input = document.createElement('div')
+		shell.input.setAttribute("id", "input")
+
+		shell.command = ''
+		shell.cursor = 0
+
+		this.renderCLI()
+
+		window.onkeydown = function (e: KeyboardEvent) {
+			if (e.key === 'Enter') {
+				shell.history.push(shell.command)
+				shell.historyPointer = shell.history.length
+				shell.exec(shell.command)
+				shell.node.scrollTop = shell.node.scrollHeight
+				const prefix: string = shell.fs.getPath() + ' > '
+				shell.input.textContent = prefix
+
+			} else if (e.key === 'ArrowUp') {
+				if (shell.historyPointer > 0) {
+					shell.command = shell.history[--shell.historyPointer]
+					shell.cursor = shell.command.length
+				}
+			} else if (e.key === 'ArrowDown') {
+				if (shell.historyPointer < shell.history.length - 1) {
+					shell.command = shell.history[++shell.historyPointer]
+				} else {
+					shell.historyPointer = shell.history.length
+					shell.command = ''
+				}
+				shell.cursor = shell.command.length
+
+			} else if (e.key === 'Tab') {
+				e.preventDefault()
+				const [bin, ...args]: string[] = shell.parse(shell.command)
+				if (args.length === 0) {
+					for (let kw of shell.keywords) {
+						if (kw.indexOf(bin) >= 0) {
+							shell.command = kw + ' '
+							shell.cursor = shell.command.length
+							break
 						}
 					}
-				}else if(shell.enterLine.input.value.split(' ').length==2&&shell.enterLine.input.value.split(' ')[0]=='visit'){
-					for(let p of shell.pages){
-						if(p.indexOf(shell.enterLine.input.value.split(' ')[1])>=0){
-							shell.enterLine.input.value="visit "+p;
-							break;
-						}
-					}
-				}else if(shell.enterLine.input.value.split(' ').length>1){
-					const handler:VFSResponse=shell.fs.ls();
-					if(handler.code==0){
-						const list=handler.message;
-						for(let i of list){
-							const words=shell.enterLine.input.value.split(' ');
-							if(i.indexOf(words[words.length-1])>=0){
-								const command=shell.enterLine.input.value.slice(0,shell.enterLine.input.value.length-words[words.length-1].length);
-								shell.enterLine.input.value=command+i;
-								break;
+				} else if (args.length > 0) {
+					const handler: VFSResponse = shell.fs.ls()
+					if (handler.code === 0) {
+						const list: string[] = handler.result
+						for (let i of list) {
+							if (i.indexOf(args[args.length - 1]) >= 0) {
+								const command: string = shell.command
+									.slice(0, shell.command.length - args[args.length - 1].length)
+								shell.command = command + i
+								shell.cursor = shell.command.length
+								break
 							}
 						}
 					}
 				}
-			}
-		}
-		shell.enterLine.input.oninput=function(e:any){
-			if(shell.enterLine.input.value.length>=50){
-				shell.enterLine.input.value=shell.enterLine.input.value.slice(0,50);
-			}
-		}
-		shell.enterLine.appendChild(shell.enterLine.label);
-		shell.enterLine.appendChild(shell.enterLine.input);
-		shell.node.appendChild(shell.enterLine);
-		shell.enterLine.input.focus();
-	}
-	ls(path:string):void{
-		let dir:string;
-		if(path&&path=="/"){
-			this.error("permission denied");
-			return;
-		}
-		if(path&&path[path.length-1]=="/"){
-			dir=path.slice(0,path.length-1);
-		}else{
-			dir=path;
-		}
-		//cd dir
-		if(dir){
-			//store currentDir
-			const currentDir=this.fs.getPath()
-			//cd target dir
-			const handler:VFSResponse=this.fs.cd(dir);
-			console.log("ls",dir);
-			if(handler.code==0){
-				const list=this.fs.ls().result;
-				let str="";
-				for(let i of list){
-					str+=i+" ";
+			} else if (/^[a-zA-Z0-9\s\_\-\=\\\+\/\`\~\!\@\#\$\%\^\&\*\(\)\,\.\{\}\"\'\<\>\?\:\\t]{1}$/g.test(e.key)) {
+				const oldStr: string = shell.command
+				shell.command = oldStr.slice(0, shell.cursor) + e.key + oldStr.slice(shell.cursor)
+				const prefix: string = shell.fs.getPath() + ' > '
+				shell.input.innerText = prefix + shell.command
+				shell.cursor++
+			} else if (e.key === 'ArrowLeft') {
+				if (shell.cursor > 0) {
+					shell.cursor--
 				}
-				this.echo(str);
-				//restore currentDir without check
-				this.fs.cd(currentDir);
-			}else{
-				this.error(handler.message);
+			} else if (e.key === 'ArrowRight') {
+				if (shell.cursor < shell.command.length) {
+					shell.cursor++
+				}
+			} else if (e.key === 'Backspace') {
+				if (shell.cursor > 0) {
+					const oldStr: string = shell.command
+					shell.command = oldStr.slice(0, shell.cursor - 1) + oldStr.slice(shell.cursor)
+					shell.cursor--
+				}
 			}
-		}else{
-			const list=this.fs.ls().message;
-			let str="";
-			for(let i of list){
-				str+=i+" ";
+			shell.renderCLI()
+		}
+		shell.enterLine.appendChild(shell.input)
+		shell.node.appendChild(shell.enterLine)
+	}
+	ls(path: string): void {
+		if (path && path[0] === "/") {
+			this.error("ls: /: No such file or directory")
+			return
+		}
+
+		const dir: string = !path
+			? '.'
+			: path && path[path.length - 1] === "/"
+				? path.slice(0, path.length - 1)
+				: path
+
+		if (dir) {
+			//store workDir
+			const workDir = this.fs.getPath()
+			//cd target dir
+			const handler: VFSResponse = this.fs.cd(dir)
+			if (handler.code === 0) {
+				const list = this.fs.ls().result
+				let str = ""
+				for (let i of list) {
+					str += i + " "
+				}
+				this.echo(str)
+				//restore workDir without check
+				this.fs.cd(workDir)
+			} else {
+				this.error(handler.message)
 			}
-			this.echo(str);
-		}			
-
-	}
-	cd(path:string):void{
-		//if path == null
-		if(!path){
-			path='~';
-		}
-		//if path end width '/'
-		if(path[path.length-1]=="/"){
-			path.slice(0,path.length-1)
-		}
-		const handler:VFSResponse=this.fs.cd(path);
-		if(handler.code<0){
-			this.error(handler.message);
-		}
-	}
-	pwd():void{
-		this.echo(this.fs.getPath());
-	}
-	help():void{
-		this.echo('visit\t[home|music|markdown|lab|toys|ui|resume]');
-		this.echo('render\t[file]');
-		this.echo('echo\t[arg...]');
-		this.echo('touch\t[file]');
-		this.echo('cat\t[file]');
-		this.echo('cd\t[dir]');
-		this.echo('clear\t');
-		this.echo('help\t');
-		this.echo('pwd\t')
-		this.echo('ls\t');
-	}
-	cat(path:string):void{
-		let handler;
-		if(path.lastIndexOf('/')==-1){
-			const fileName=path;
-			handler=this.fs.cat(fileName);
-
-		}else{
-			const fileName=path.slice(path.lastIndexOf('/')+1,path.length);
-			const dir=path.slice(0,path.lastIndexOf('/'));
-			
-			//store currentDir
-			const currentDir=this.fs.getPath()
-
-			//cd dir
-			if(dir){this.fs.cd(dir);}
-			
-			handler=this.fs.cat(fileName);
-			
-			//restore currentDir
-			if(dir){this.fs.cd(currentDir);}
+		} else {
+			const list = this.fs.ls().result
+			let str = ""
+			for (let i of list) {
+				str += i + " "
+			}
+			this.echo(str)
 		}
 
-		if(handler.code==0){
-			this.echo(handler.result[0]);
-		}else if(handler.code<0){
+	}
+	cd(path: string): void {
+		const dir = !path
+			? '~'
+			: path[path.length - 1] === "/"
+				? path.slice(0, path.length - 1)
+				: path
+
+		const handler: VFSResponse = this.fs.cd(dir)
+		if (handler.code < 0) {
 			this.error(handler.message)
 		}
 	}
-	touch(fileName:string):void{
-		const handler:VFSResponse=this.fs.touch(fileName);
-		if(handler.code<0){
-			this.error(handler.message);
-		}
+	pwd(): void {
+		this.echo(this.fs.getPath())
 	}
-	mkdir(path:string):void{
-		let handler;
-		//if path end width '/'
-		if(path=="/"){
-			this.error("/: is a folder");
-			return;
-		}
-		if(path[path.length-1]=="/"){
-			path.slice(0,path.length-1);
-		}
-		if(path.lastIndexOf('/')==-1){
-			const folderName=path;
-	 		handler=this.fs.mkdir(folderName);
-		}else{
-			const folderName=path.slice(path.lastIndexOf('/')+1,path.length);
-			const dir=path.slice(0,path.lastIndexOf('/'));
-			
-			//store currentDir
-			const currentDir=this.fs.getPath()
+	help(): void {
+		const helpList = [
+			// 'visit\t[home|music|markdown|lab|toys|ui|resume]',
+			'render\t[file]',
+			'echo\t[arg...]',
+			'touch\t[file]',
+			'cat\t[file]',
+			'cd\t[dir]',
+			'clear\t',
+			'help\t',
+			'pwd\t',
+			'ls\t'
+		]
+		helpList.forEach(line => this.echo(line))
+	}
 
-			//cd dir
-			if(dir){this.fs.cd(dir);}
-		
-	 		handler=this.fs.mkdir(folderName);
-			
-				//restore currentDir
-			if(dir){this.fs.cd(currentDir);}
+	cat(target: string): void {
+		const workDir = this.fs.getPath()
+		const pathes = target.split('/')
+		if (!pathes[pathes.length - 1]) {
+			this.error('illegal filename')
+			return
+		}
+		let index = 0
+		let content: string[];
+		while (index < pathes.length) {
+			const path = pathes[index]
+			const handler: VFSResponse = index < pathes.length - 1
+				? this.fs.cd(path)
+				: this.fs.cat(path)
+			if (handler.code < 0) {
+				this.error(handler.message)
+				this.fs.cd(workDir)
+				return
+			}
+			content = handler.result;
+			index++
+		}
+		this.fs.cd(workDir);
+		this.echo(content[0]);
+	}
+	touch(fileName: string): void {
+		if (fileName && fileName[0] === "/") {
+			this.error("touch: /: No such file or directory")
+			return
+		}
+		const workDir = this.fs.getPath()
+		const pathes = fileName.split('/')
+
+		if (!pathes[pathes.length - 1]) {
+			this.error('illegal filename')
+			return
+		}
+		let index = 0
+		while (index < pathes.length) {
+			const path = pathes[index]
+			const handler: VFSResponse = index < pathes.length - 1
+				? this.fs.cd(path)
+				: this.fs.touch(path)
+			if (handler.code < 0) {
+				this.error(handler.message)
+				this.fs.cd(workDir)
+				return
+			}
+			index++
+		}
+		this.fs.cd(workDir)
+	}
+	rm(...args: string[]): void {
+		const flag = args
+			.filter(arg => arg.indexOf('-') === 0)
+			.map(arg => arg.replace('-', ''))
+			.join('')
+		const targetName = args[args.length - 1]
+		if (targetName && targetName[0] === "/") {
+			this.error("rm: /: No such file or directory")
+			return
 		}
 
-		if(handler.code<0){
-			this.error(handler.message);
+		const workDir = this.fs.getPath()
+		const pathes = targetName.split('/')
+		let index = 0
+		while (index < pathes.length) {
+			const path = pathes[index]
+			const handler: VFSResponse = index < pathes.length - 1
+				? this.fs.cd(path)
+				: this.fs.rm(path, flag)
+			if (handler.code < 0) {
+				this.error(handler.message)
+				this.fs.cd(workDir)
+				return
+			}
+			index++
 		}
+		this.fs.cd(workDir)
 	}
-	clear():void{
-		this.node.innerHTML="";
-		this.newLine();
+	mkdir(target: string): void {
+		const workDir = this.fs.getPath()
+		const pathes = target.split('/').filter(c => !!c)
+		let index = 0
+		while (index < pathes.length) {
+			const path = pathes[index]
+			const handler: VFSResponse = index < pathes.length - 1
+				? this.fs.cd(path)
+				: this.fs.mkdir(path)
+			if (handler.code < 0) {
+				this.error(handler.message)
+				this.fs.cd(workDir)
+				return
+			}
+			index++
+		}
+		this.fs.cd(workDir)
 	}
-	echo(str:string):void{
-		const line=document.createElement('div');
-		if(str){
-			const words=str.split(' ');
-			for(const word of words){
-				const node=document.createElement('span');
-				node.innerHTML=word;
-				const space=document.createElement('span');
-				space.innerHTML=' ';
-				line.appendChild(node);
-				line.appendChild(space);
+	clear(): void {
+		this.node.innerHTML = ""
+		this.newLine()
+	}
+	private print(str: string) {
+		const line = document.createElement('div')
+		if (str) {
+			const words = str.split(' ')
+			for (const word of words) {
+				const node = document.createElement('span')
+				node.innerHTML = word
+				const space = document.createElement('span')
+				space.innerHTML = ' '
+				line.appendChild(node)
+				line.appendChild(space)
 			}
 		}
-		this.node.insertBefore(line,this.enterLine);
+		this.node.insertBefore(line, this.enterLine)
 	}
-	write(str:string,target:string):void{
-		const handler:VFSResponse=this.fs.write(str,target);
-		if(handler.code<0){
-			this.error(handler.message);
+	echo(rawStr: string, op?: string, target?: string): void {
+		const str = rawStr.replace(`"`, '').replace(`'`, '')
+			
+		if (op && op === '>>') {
+			this.append(str, target)
+		} else if (op && op === '>') {
+			this.write(str, target)
+		} else {
+			this.print(str)
 		}
 	}
-	append(str:string,target:string):void{
-		const handler:VFSResponse=this.fs.append(str,target);
-		if(handler.code<0){
-			this.error(handler.message);
+	write(str: string, target: string): void {
+		if (target && target[0] === "/") {
+			this.error("write: /: No such file or directory")
+			return
 		}
+		const workDir = this.fs.getPath()
+		const pathes = target.split('/')
+		if (!pathes[pathes.length - 1]) {
+			this.error('illegal filename')
+			return
+		}
+		let index = 0
+		while (index < pathes.length) {
+			const path = pathes[index]
+			const handler: VFSResponse = index < pathes.length - 1
+				? this.fs.cd(path)
+				: this.fs.write(str, path)
+			if (handler.code < 0) {
+				this.error(handler.message)
+				this.fs.cd(workDir)
+				return
+			}
+			index++
+		}
+		this.fs.cd(workDir)
 	}
-	visit(page:string):void{
-		if(this.pages.indexOf(page)>=0){
-			const host=document.domain.split('.'); 
-			window.location.href='http://'+page+'.'+host[1]+'.'+host[2];
-		}else{
+	append(str: string, target: string): void {
+		if (target && target[0] === "/") {
+			this.error("append: /: No such file or directory")
+			return
+		}
+		const workDir = this.fs.getPath()
+		const pathes = target.split('/')
+		if (!pathes[pathes.length - 1]) {
+			this.error('illegal filename')
+			return
+		}
+		let index = 0
+		while (index < pathes.length) {
+			const path = pathes[index]
+			const handler: VFSResponse = index < pathes.length - 1
+				? this.fs.cd(path)
+				: this.fs.append(str, path)
+			if (handler.code < 0) {
+				this.error(handler.message)
+				this.fs.cd(workDir)
+				return
+			}
+			index++
+		}
+		this.fs.cd(workDir)
+
+	}
+	visit(page: string): void {
+		if (this.pages.indexOf(page) >= 0) {
+			const host = document.domain.split('.')
+			window.location.href = 'http://' + page + '.' + host[1] + '.' + host[2]
+		} else {
 			this.error('no such page')
 		}
 	}
-	error(err:string):void{
-		this.echo(err);
+	error(err: string): void {
+		this.echo(err)
 	}
-	render(path:string):void{
-		let handler;
-		if(path.lastIndexOf('/')==-1){
-			const fileName=path;
-			handler=this.fs.cat(fileName);
-
-		}else{
-			const fileName=path.slice(path.lastIndexOf('/')+1,path.length);
-			const dir=path.slice(0,path.lastIndexOf('/'));
-			
-			//store currentDir
-			const currentDir=this.fs.getPath()
-
-			//cd dir
-			if(dir){this.fs.cd(dir);}
-			
-			handler=this.fs.cat(fileName);
-			
-			//restore currentDir
-			if(dir){this.fs.cd(currentDir);}
+	render(target: string): void {
+		const workDir = this.fs.getPath()
+		const pathes = target.split('/')
+		if (!pathes[pathes.length - 1]) {
+			this.error('illegal filename')
+			return
 		}
-
-		if(handler.code==0){
-			this.particles.setText(handler.result[0]);
-			this.particles.render();
-		}else if(handler.code<0){
-			this.error(handler.message)
+		let index = 0
+		let content: string[];
+		while (index < pathes.length) {
+			const path = pathes[index]
+			const handler: VFSResponse = index < pathes.length - 1
+				? this.fs.cd(path)
+				: this.fs.cat(path)
+			if (handler.code < 0) {
+				this.error(handler.message)
+				this.fs.cd(workDir)
+				return
+			}
+			content = handler.result;
+			index++
 		}
+		this.fs.cd(workDir);
+
+		this.particles.setText(content[0])
+		this.particles.render()
 	}
-	exec(command:string):void{
-		command.replace(/\s*/g,' ');
-		this.label=this.fs.getPath()+' > ';
-
-		this.echo(this.label+command);
-
-		const words=command.split(' ');
-
-		switch(words[0]){
-			case '':
-				break;
-			case 'ls':
-				this.ls(words[1]);
-				break;
-			case 'cd':
-				this.cd(words[1]);
-				break;
-			case 'pwd':
-				this.pwd();
-				break;
-			case 'help':
-				this.help();
-				break;
-			case 'touch':
-				this.touch(words[1]);
-				break;
-			case 'mkdir':
-				this.mkdir(words[1]);
-				break;
-			case 'echo':
-				if(command.replace(/\".*\"/g,'').indexOf('>>')>0){
-					const target=command.replace(/\".*\"/g,'').split('>>')[1].replace(/\s/g,'');
-					const str=command.split('"')[1]
-					this.append(str,target);
-				}else if(command.replace(/\".*\"/g,'').indexOf('>')>0){
-					const target=command.replace(/\".*\"/g,'').split('>')[1].replace(/\s/g,'');
-					const str=command.split('"')[1]
-					this.write(str,target);
-				}else{
-					const str=command.split('"')[1]
-					this.echo(str);
+	parse(command: string): string[] {
+		let inStr = false
+		return command.split('')
+			.reduce((words: string[], c: string) => {
+				if (c === '"') {
+					inStr = !inStr
+				} else if (c === ' ' && !inStr) {
+					if (words[words.length] !== '') {
+						words = [...words, '']
+					}
+				} else {
+					words[words.length - 1] += c
 				}
-				break;
-			case 'clear':
-				this.clear();
-				break;
-			case 'render':
-				this.render(words[1]);
-				break;
-			case 'cat':
-				this.cat(words[1]);
-				break;
-			case 'visit':
-				this.visit(words[1]);
-				break;
-			default:
-				this.error('bash : command not found '+words[0]);
-				break;
-		}
+				return words
+			}, [''])
 	}
+	exec(command: string): void {
+		const shell: any = this
+		let prefix: string = shell.fs.getPath() + ' > '
+		shell.print(prefix + command)
+		const words: string[] = shell.parse(command)
+		const [bin, ...args] = words
 
+		if (!bin) {
+			//do nothing
+		} else if (typeof shell[bin] === 'function') {
+			shell[bin](...args)
+		} else {
+			shell.echo('v-shell : command not found.')
+		}
+
+		prefix = shell.fs.getPath() + ' > '
+		shell.command = ''
+		shell.cursor = 0
+	}
 }

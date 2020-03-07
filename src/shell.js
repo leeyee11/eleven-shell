@@ -1,3 +1,10 @@
+var __spreadArrays = (this && this.__spreadArrays) || function () {
+    for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
+    for (var r = Array(s), k = 0, i = 0; i < il; i++)
+        for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++)
+            r[k] = a[j];
+    return r;
+};
 var Shell = (function () {
     function Shell(app) {
         this.node = document.createElement('code');
@@ -5,111 +12,134 @@ var Shell = (function () {
         this.fs = new VFS();
         this.history = [];
         this.historyPointer = null;
-        this.keywords = ['ls', 'cd', 'cat', 'echo', 'help', 'clear', 'touch', 'render', 'visit'];
+        this.keywords = ['ls', 'cd', 'cat', 'echo', 'help', 'clear', 'touch', 'visit', 'mkdir', 'rm', 'render'];
         this.pages = ['music', 'markdown', 'lab', 'toys', 'ui', 'resume'];
         this.particles = new Particles(app);
     }
+    Shell.prototype.renderCLI = function () {
+        var shell = this;
+        var prefix = shell.fs.getPath() + ' > ';
+        var labels = __spreadArrays(shell.command.split(''), [' ']).map(function (char, i) {
+            var span = document.createElement('span');
+            span.innerHTML = char === ' ' ? '&nbsp' : char;
+            if (i === shell.cursor) {
+                span.style.background = "#acacac";
+            }
+            return span;
+        });
+        var preLabel = document.createElement('span');
+        preLabel.innerText = prefix;
+        shell.input.innerHTML = null;
+        shell.input.appendChild(preLabel);
+        labels.forEach(function (label) { return shell.input.append(label); });
+    };
     Shell.prototype.newLine = function () {
         var shell = this;
         shell.enterLine = document.createElement('div');
         shell.enterLine.style.position = "relative";
-        shell.enterLine.label = document.createElement('label');
-        shell.enterLine.label.innerHTML = shell.fs.getPath() + ' > ';
-        shell.enterLine.label.style.position = "absolute";
-        shell.enterLine.input = document.createElement('input');
-        shell.enterLine.input.spellcheck = false;
-        shell.enterLine.input.value = "";
-        shell.enterLine.input.style.paddingLeft = (shell.fs.getPath() + ' > ').length * 9.6 + "px";
-        shell.enterLine.input.onkeydown = function (e) {
-            if (e.key == 'Enter') {
-                shell.history.push(shell.enterLine.input.value);
+        shell.input = document.createElement('div');
+        shell.input.setAttribute("id", "input");
+        shell.command = '';
+        shell.cursor = 0;
+        this.renderCLI();
+        window.onkeydown = function (e) {
+            if (e.key === 'Enter') {
+                shell.history.push(shell.command);
                 shell.historyPointer = shell.history.length;
-                shell.exec(shell.enterLine.input.value);
+                shell.exec(shell.command);
                 shell.node.scrollTop = shell.node.scrollHeight;
-                shell.enterLine.input.value = "";
-                shell.enterLine.label.innerHTML = shell.fs.getPath() + ' > ';
-                shell.enterLine.input.style.paddingLeft = (shell.fs.getPath() + ' > ').length * 9.6 + "px";
+                var prefix = shell.fs.getPath() + ' > ';
+                shell.input.textContent = prefix;
             }
-            else if (e.key == 'ArrowUp') {
+            else if (e.key === 'ArrowUp') {
                 if (shell.historyPointer > 0) {
-                    shell.enterLine.input.value = shell.history[--shell.historyPointer];
+                    shell.command = shell.history[--shell.historyPointer];
+                    shell.cursor = shell.command.length;
                 }
             }
-            else if (e.key == 'ArrowDown') {
+            else if (e.key === 'ArrowDown') {
                 if (shell.historyPointer < shell.history.length - 1) {
-                    shell.enterLine.input.value = shell.history[++shell.historyPointer];
+                    shell.command = shell.history[++shell.historyPointer];
                 }
                 else {
-                    if (shell.historyPointer < shell.history.length) {
-                        ++shell.historyPointer;
-                    }
-                    shell.enterLine.input.value = "";
+                    shell.historyPointer = shell.history.length;
+                    shell.command = '';
                 }
+                shell.cursor = shell.command.length;
             }
-            else if (e.key == 'Tab') {
+            else if (e.key === 'Tab') {
                 e.preventDefault();
-                if (shell.enterLine.input.value.split(' ').length == 1) {
-                    for (var _i = 0, _a = shell.keywords; _i < _a.length; _i++) {
-                        var kw = _a[_i];
-                        if (kw.indexOf(shell.enterLine.input.value) >= 0) {
-                            shell.enterLine.input.value = kw;
+                var _a = shell.parse(shell.command), bin = _a[0], args = _a.slice(1);
+                if (args.length === 0) {
+                    for (var _i = 0, _b = shell.keywords; _i < _b.length; _i++) {
+                        var kw = _b[_i];
+                        if (kw.indexOf(bin) >= 0) {
+                            shell.command = kw + ' ';
+                            shell.cursor = shell.command.length;
                             break;
                         }
                     }
                 }
-                else if (shell.enterLine.input.value.split(' ').length == 2 && shell.enterLine.input.value.split(' ')[0] == 'visit') {
-                    for (var _b = 0, _c = shell.pages; _b < _c.length; _b++) {
-                        var p = _c[_b];
-                        if (p.indexOf(shell.enterLine.input.value.split(' ')[1]) >= 0) {
-                            shell.enterLine.input.value = "visit " + p;
-                            break;
-                        }
-                    }
-                }
-                else if (shell.enterLine.input.value.split(' ').length > 1) {
+                else if (args.length > 0) {
                     var handler = shell.fs.ls();
-                    if (handler.code == 0) {
-                        var list = handler.message;
-                        for (var _d = 0, list_1 = list; _d < list_1.length; _d++) {
-                            var i = list_1[_d];
-                            var words = shell.enterLine.input.value.split(' ');
-                            if (i.indexOf(words[words.length - 1]) >= 0) {
-                                var command = shell.enterLine.input.value.slice(0, shell.enterLine.input.value.length - words[words.length - 1].length);
-                                shell.enterLine.input.value = command + i;
+                    if (handler.code === 0) {
+                        var list = handler.result;
+                        for (var _c = 0, list_1 = list; _c < list_1.length; _c++) {
+                            var i = list_1[_c];
+                            if (i.indexOf(args[args.length - 1]) >= 0) {
+                                var command = shell.command
+                                    .slice(0, shell.command.length - args[args.length - 1].length);
+                                shell.command = command + i;
+                                shell.cursor = shell.command.length;
                                 break;
                             }
                         }
                     }
                 }
             }
-        };
-        shell.enterLine.input.oninput = function (e) {
-            if (shell.enterLine.input.value.length >= 50) {
-                shell.enterLine.input.value = shell.enterLine.input.value.slice(0, 50);
+            else if (/^[a-zA-Z0-9\s\_\-\=\\\+\/\`\~\!\@\#\$\%\^\&\*\(\)\,\.\{\}\"\'\<\>\?\:\\t]{1}$/g.test(e.key)) {
+                var oldStr = shell.command;
+                shell.command = oldStr.slice(0, shell.cursor) + e.key + oldStr.slice(shell.cursor);
+                var prefix = shell.fs.getPath() + ' > ';
+                shell.input.innerText = prefix + shell.command;
+                shell.cursor++;
             }
+            else if (e.key === 'ArrowLeft') {
+                if (shell.cursor > 0) {
+                    shell.cursor--;
+                }
+            }
+            else if (e.key === 'ArrowRight') {
+                if (shell.cursor < shell.command.length) {
+                    shell.cursor++;
+                }
+            }
+            else if (e.key === 'Backspace') {
+                if (shell.cursor > 0) {
+                    var oldStr = shell.command;
+                    shell.command = oldStr.slice(0, shell.cursor - 1) + oldStr.slice(shell.cursor);
+                    shell.cursor--;
+                }
+            }
+            shell.renderCLI();
         };
-        shell.enterLine.appendChild(shell.enterLine.label);
-        shell.enterLine.appendChild(shell.enterLine.input);
+        shell.enterLine.appendChild(shell.input);
         shell.node.appendChild(shell.enterLine);
-        shell.enterLine.input.focus();
     };
     Shell.prototype.ls = function (path) {
-        var dir;
-        if (path && path == "/") {
-            this.error("permission denied");
+        if (path && path[0] === "/") {
+            this.error("ls: /: No such file or directory");
             return;
         }
-        if (path && path[path.length - 1] == "/") {
-            dir = path.slice(0, path.length - 1);
-        }
-        else {
-            dir = path;
-        }
+        var dir = !path
+            ? '.'
+            : path && path[path.length - 1] === "/"
+                ? path.slice(0, path.length - 1)
+                : path;
         if (dir) {
-            var currentDir = this.fs.getPath();
+            var workDir = this.fs.getPath();
             var handler = this.fs.cd(dir);
-            console.log("ls", dir);
-            if (handler.code == 0) {
+            if (handler.code === 0) {
                 var list = this.fs.ls().result;
                 var str = "";
                 for (var _i = 0, list_2 = list; _i < list_2.length; _i++) {
@@ -117,14 +147,14 @@ var Shell = (function () {
                     str += i + " ";
                 }
                 this.echo(str);
-                this.fs.cd(currentDir);
+                this.fs.cd(workDir);
             }
             else {
                 this.error(handler.message);
             }
         }
         else {
-            var list = this.fs.ls().message;
+            var list = this.fs.ls().result;
             var str = "";
             for (var _a = 0, list_3 = list; _a < list_3.length; _a++) {
                 var i = list_3[_a];
@@ -134,13 +164,12 @@ var Shell = (function () {
         }
     };
     Shell.prototype.cd = function (path) {
-        if (!path) {
-            path = '~';
-        }
-        if (path[path.length - 1] == "/") {
-            path.slice(0, path.length - 1);
-        }
-        var handler = this.fs.cd(path);
+        var dir = !path
+            ? '~'
+            : path[path.length - 1] === "/"
+                ? path.slice(0, path.length - 1)
+                : path;
+        var handler = this.fs.cd(dir);
         if (handler.code < 0) {
             this.error(handler.message);
         }
@@ -149,82 +178,125 @@ var Shell = (function () {
         this.echo(this.fs.getPath());
     };
     Shell.prototype.help = function () {
-        this.echo('visit\t[home|music|markdown|lab|toys|ui|resume]');
-        this.echo('render\t[file]');
-        this.echo('echo\t[arg...]');
-        this.echo('touch\t[file]');
-        this.echo('cat\t[file]');
-        this.echo('cd\t[dir]');
-        this.echo('clear\t');
-        this.echo('help\t');
-        this.echo('pwd\t');
-        this.echo('ls\t');
+        var _this = this;
+        var helpList = [
+            'render\t[file]',
+            'echo\t[arg...]',
+            'touch\t[file]',
+            'cat\t[file]',
+            'cd\t[dir]',
+            'clear\t',
+            'help\t',
+            'pwd\t',
+            'ls\t'
+        ];
+        helpList.forEach(function (line) { return _this.echo(line); });
     };
-    Shell.prototype.cat = function (path) {
-        var handler;
-        if (path.lastIndexOf('/') == -1) {
-            var fileName = path;
-            handler = this.fs.cat(fileName);
-        }
-        else {
-            var fileName = path.slice(path.lastIndexOf('/') + 1, path.length);
-            var dir = path.slice(0, path.lastIndexOf('/'));
-            var currentDir = this.fs.getPath();
-            if (dir) {
-                this.fs.cd(dir);
-            }
-            handler = this.fs.cat(fileName);
-            if (dir) {
-                this.fs.cd(currentDir);
-            }
-        }
-        if (handler.code == 0) {
-            this.echo(handler.result[0]);
-        }
-        else if (handler.code < 0) {
-            this.error(handler.message);
-        }
-    };
-    Shell.prototype.touch = function (fileName) {
-        var handler = this.fs.touch(fileName);
-        if (handler.code < 0) {
-            this.error(handler.message);
-        }
-    };
-    Shell.prototype.mkdir = function (path) {
-        var handler;
-        if (path == "/") {
-            this.error("/: is a folder");
+    Shell.prototype.cat = function (target) {
+        var workDir = this.fs.getPath();
+        var pathes = target.split('/');
+        if (!pathes[pathes.length - 1]) {
+            this.error('illegal filename');
             return;
         }
-        if (path[path.length - 1] == "/") {
-            path.slice(0, path.length - 1);
-        }
-        if (path.lastIndexOf('/') == -1) {
-            var folderName = path;
-            handler = this.fs.mkdir(folderName);
-        }
-        else {
-            var folderName = path.slice(path.lastIndexOf('/') + 1, path.length);
-            var dir = path.slice(0, path.lastIndexOf('/'));
-            var currentDir = this.fs.getPath();
-            if (dir) {
-                this.fs.cd(dir);
+        var index = 0;
+        var content;
+        while (index < pathes.length) {
+            var path = pathes[index];
+            var handler = index < pathes.length - 1
+                ? this.fs.cd(path)
+                : this.fs.cat(path);
+            if (handler.code < 0) {
+                this.error(handler.message);
+                this.fs.cd(workDir);
+                return;
             }
-            handler = this.fs.mkdir(folderName);
-            if (dir) {
-                this.fs.cd(currentDir);
+            content = handler.result;
+            index++;
+        }
+        this.fs.cd(workDir);
+        this.echo(content[0]);
+    };
+    Shell.prototype.touch = function (fileName) {
+        if (fileName && fileName[0] === "/") {
+            this.error("touch: /: No such file or directory");
+            return;
+        }
+        var workDir = this.fs.getPath();
+        var pathes = fileName.split('/');
+        if (!pathes[pathes.length - 1]) {
+            this.error('illegal filename');
+            return;
+        }
+        var index = 0;
+        while (index < pathes.length) {
+            var path = pathes[index];
+            var handler = index < pathes.length - 1
+                ? this.fs.cd(path)
+                : this.fs.touch(path);
+            if (handler.code < 0) {
+                this.error(handler.message);
+                this.fs.cd(workDir);
+                return;
             }
+            index++;
         }
-        if (handler.code < 0) {
-            this.error(handler.message);
+        this.fs.cd(workDir);
+    };
+    Shell.prototype.rm = function () {
+        var args = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            args[_i] = arguments[_i];
         }
+        var flag = args
+            .filter(function (arg) { return arg.indexOf('-') === 0; })
+            .map(function (arg) { return arg.replace('-', ''); })
+            .join('');
+        var targetName = args[args.length - 1];
+        if (targetName && targetName[0] === "/") {
+            this.error("rm: /: No such file or directory");
+            return;
+        }
+        var workDir = this.fs.getPath();
+        var pathes = targetName.split('/');
+        var index = 0;
+        while (index < pathes.length) {
+            var path = pathes[index];
+            var handler = index < pathes.length - 1
+                ? this.fs.cd(path)
+                : this.fs.rm(path, flag);
+            if (handler.code < 0) {
+                this.error(handler.message);
+                this.fs.cd(workDir);
+                return;
+            }
+            index++;
+        }
+        this.fs.cd(workDir);
+    };
+    Shell.prototype.mkdir = function (target) {
+        var workDir = this.fs.getPath();
+        var pathes = target.split('/').filter(function (c) { return !!c; });
+        var index = 0;
+        while (index < pathes.length) {
+            var path = pathes[index];
+            var handler = index < pathes.length - 1
+                ? this.fs.cd(path)
+                : this.fs.mkdir(path);
+            if (handler.code < 0) {
+                this.error(handler.message);
+                this.fs.cd(workDir);
+                return;
+            }
+            index++;
+        }
+        this.fs.cd(workDir);
     };
     Shell.prototype.clear = function () {
         this.node.innerHTML = "";
         this.newLine();
     };
-    Shell.prototype.echo = function (str) {
+    Shell.prototype.print = function (str) {
         var line = document.createElement('div');
         if (str) {
             var words = str.split(' ');
@@ -240,17 +312,69 @@ var Shell = (function () {
         }
         this.node.insertBefore(line, this.enterLine);
     };
-    Shell.prototype.write = function (str, target) {
-        var handler = this.fs.write(str, target);
-        if (handler.code < 0) {
-            this.error(handler.message);
+    Shell.prototype.echo = function (rawStr, op, target) {
+        var str = rawStr.replace("\"", '').replace("'", '');
+        if (op && op === '>>') {
+            this.append(str, target);
+        }
+        else if (op && op === '>') {
+            this.write(str, target);
+        }
+        else {
+            this.print(str);
         }
     };
-    Shell.prototype.append = function (str, target) {
-        var handler = this.fs.append(str, target);
-        if (handler.code < 0) {
-            this.error(handler.message);
+    Shell.prototype.write = function (str, target) {
+        if (target && target[0] === "/") {
+            this.error("write: /: No such file or directory");
+            return;
         }
+        var workDir = this.fs.getPath();
+        var pathes = target.split('/');
+        if (!pathes[pathes.length - 1]) {
+            this.error('illegal filename');
+            return;
+        }
+        var index = 0;
+        while (index < pathes.length) {
+            var path = pathes[index];
+            var handler = index < pathes.length - 1
+                ? this.fs.cd(path)
+                : this.fs.write(str, path);
+            if (handler.code < 0) {
+                this.error(handler.message);
+                this.fs.cd(workDir);
+                return;
+            }
+            index++;
+        }
+        this.fs.cd(workDir);
+    };
+    Shell.prototype.append = function (str, target) {
+        if (target && target[0] === "/") {
+            this.error("append: /: No such file or directory");
+            return;
+        }
+        var workDir = this.fs.getPath();
+        var pathes = target.split('/');
+        if (!pathes[pathes.length - 1]) {
+            this.error('illegal filename');
+            return;
+        }
+        var index = 0;
+        while (index < pathes.length) {
+            var path = pathes[index];
+            var handler = index < pathes.length - 1
+                ? this.fs.cd(path)
+                : this.fs.append(str, path);
+            if (handler.code < 0) {
+                this.error(handler.message);
+                this.fs.cd(workDir);
+                return;
+            }
+            index++;
+        }
+        this.fs.cd(workDir);
     };
     Shell.prototype.visit = function (page) {
         if (this.pages.indexOf(page) >= 0) {
@@ -264,90 +388,67 @@ var Shell = (function () {
     Shell.prototype.error = function (err) {
         this.echo(err);
     };
-    Shell.prototype.render = function (path) {
-        var handler;
-        if (path.lastIndexOf('/') == -1) {
-            var fileName = path;
-            handler = this.fs.cat(fileName);
+    Shell.prototype.render = function (target) {
+        var workDir = this.fs.getPath();
+        var pathes = target.split('/');
+        if (!pathes[pathes.length - 1]) {
+            this.error('illegal filename');
+            return;
         }
-        else {
-            var fileName = path.slice(path.lastIndexOf('/') + 1, path.length);
-            var dir = path.slice(0, path.lastIndexOf('/'));
-            var currentDir = this.fs.getPath();
-            if (dir) {
-                this.fs.cd(dir);
+        var index = 0;
+        var content;
+        while (index < pathes.length) {
+            var path = pathes[index];
+            var handler = index < pathes.length - 1
+                ? this.fs.cd(path)
+                : this.fs.cat(path);
+            if (handler.code < 0) {
+                this.error(handler.message);
+                this.fs.cd(workDir);
+                return;
             }
-            handler = this.fs.cat(fileName);
-            if (dir) {
-                this.fs.cd(currentDir);
+            content = handler.result;
+            index++;
+        }
+        this.fs.cd(workDir);
+        this.particles.setText(content[0]);
+        this.particles.render();
+    };
+    Shell.prototype.parse = function (command) {
+        var inStr = false;
+        return command.split('')
+            .reduce(function (words, c) {
+            if (c === '"') {
+                inStr = !inStr;
             }
-        }
-        if (handler.code == 0) {
-            this.particles.setText(handler.result[0]);
-            this.particles.render();
-        }
-        else if (handler.code < 0) {
-            this.error(handler.message);
-        }
+            else if (c === ' ' && !inStr) {
+                if (words[words.length] !== '') {
+                    words = __spreadArrays(words, ['']);
+                }
+            }
+            else {
+                words[words.length - 1] += c;
+            }
+            return words;
+        }, ['']);
     };
     Shell.prototype.exec = function (command) {
-        command.replace(/\s*/g, ' ');
-        this.label = this.fs.getPath() + ' > ';
-        this.echo(this.label + command);
-        var words = command.split(' ');
-        switch (words[0]) {
-            case '':
-                break;
-            case 'ls':
-                this.ls(words[1]);
-                break;
-            case 'cd':
-                this.cd(words[1]);
-                break;
-            case 'pwd':
-                this.pwd();
-                break;
-            case 'help':
-                this.help();
-                break;
-            case 'touch':
-                this.touch(words[1]);
-                break;
-            case 'mkdir':
-                this.mkdir(words[1]);
-                break;
-            case 'echo':
-                if (command.replace(/\".*\"/g, '').indexOf('>>') > 0) {
-                    var target = command.replace(/\".*\"/g, '').split('>>')[1].replace(/\s/g, '');
-                    var str = command.split('"')[1];
-                    this.append(str, target);
-                }
-                else if (command.replace(/\".*\"/g, '').indexOf('>') > 0) {
-                    var target = command.replace(/\".*\"/g, '').split('>')[1].replace(/\s/g, '');
-                    var str = command.split('"')[1];
-                    this.write(str, target);
-                }
-                else {
-                    var str = command.split('"')[1];
-                    this.echo(str);
-                }
-                break;
-            case 'clear':
-                this.clear();
-                break;
-            case 'render':
-                this.render(words[1]);
-                break;
-            case 'cat':
-                this.cat(words[1]);
-                break;
-            case 'visit':
-                this.visit(words[1]);
-                break;
-            default:
-                this.error('bash : command not found ' + words[0]);
-                break;
+        var shell = this;
+        var prefix = shell.fs.getPath() + ' > ';
+        shell.print(prefix + command);
+        var words = shell.parse(command);
+        var bin = words[0], args = words.slice(1);
+        if (!bin) {
         }
+        else if (typeof shell[bin] === 'function') {
+            shell[bin].apply(shell, args);
+        }
+        else {
+            shell.echo('v-shell : command not found.');
+        }
+        prefix = shell.fs.getPath() + ' > ';
+        shell.command = '';
+        shell.cursor = 0;
     };
     return Shell;
 }());

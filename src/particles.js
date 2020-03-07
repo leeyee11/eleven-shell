@@ -13,7 +13,7 @@ var Particles = (function () {
         };
         this.entry = entry;
         this.canvas = document.createElement('canvas');
-        this.canvas.innerHTML = "您的浏览器不支持Canvas动画,请使用Chrome,Firefox,Safari等浏览器.";
+        this.canvas.innerHTML = "Please use Chrome/Safari/Firefox to visit this page";
         this.canvas.style.position = "absolute";
         this.canvas.style.zIndex = this.config.zIndex;
         this.canvas.style.left = "0";

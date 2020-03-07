@@ -1,7 +1,10 @@
 var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
     return function (d, b) {
         extendStatics(d, b);
         function __() { this.constructor = d; }
@@ -32,43 +35,53 @@ var VFS = (function () {
         }
         if (exist) {
             this.pointer = tempPointer;
-            return { code: 0, message: "", result: null };
+            return { code: 0, message: '', result: null };
         }
         else {
-            return { code: -1, message: 'no such a folder', result: null };
+            return { code: -1, message: 'error : no such a folder', result: null };
         }
     };
     VFS.prototype.mkdir = function (name) {
+        var bin = 'mkdir';
         if (this.pointer.getChild(name)) {
-            return { code: -1, message: "this folder has existed", result: null };
+            return { code: -1, message: bin + ": " + name + ": directory already exists", result: null };
         }
         else {
             this.pointer.addChild(name, new VFSFolder(name, this.pointer));
-            return { code: 0, message: "", result: null };
+            return { code: 0, message: '', result: null };
         }
     };
     VFS.prototype.touch = function (name) {
+        var bin = 'touch';
         if (this.pointer.getChild(name)) {
-            return { code: -1, message: "this file has existed", result: null };
+            return { code: -1, message: bin + ": " + name + ": file already exists", result: null };
         }
         else {
             this.pointer.addChild(name, new VFSFile(name, this.pointer));
-            return { code: 0, message: "", result: null };
+            return { code: 0, message: '', result: null };
         }
     };
     VFS.prototype.write = function (str, target) {
+        var bin = 'echo';
         if (this.pointer.getChild(target) == null) {
             this.touch(target);
+        }
+        else if (this.pointer.getChild(target).type === 'folder') {
+            return { code: -1, message: bin + ": " + target + ": is a directory", result: null };
         }
         this.pointer.getChild(target).write(str);
-        return { code: 0, message: "", result: null };
+        return { code: 0, message: '', result: null };
     };
     VFS.prototype.append = function (str, target) {
+        var bin = 'echo';
         if (this.pointer.getChild(target) == null) {
             this.touch(target);
         }
+        else if (this.pointer.getChild(target).type === 'folder') {
+            return { code: -1, message: bin + ": " + target + ": is a directory", result: null };
+        }
         this.pointer.getChild(target).append(str);
-        return { code: 0, message: "", result: null };
+        return { code: 0, message: '', result: null };
     };
     VFS.prototype.ls = function () {
         var result = [];
@@ -76,25 +89,41 @@ var VFS = (function () {
             var name_2 = _a[_i];
             result.push(name_2);
         }
-        return { code: 0, message: "", result: result };
+        return { code: 0, message: '', result: result };
     };
     VFS.prototype.cat = function (name) {
+        var bin = 'cat';
         if (this.pointer.getChild(name)) {
-            if (this.pointer.getChild(name).getType() == "file") {
+            if (this.pointer.getChild(name).getType() === 'file') {
                 var result = [];
                 result.push(this.pointer.getChild(name).read());
                 return { code: 0, message: "", result: result };
             }
             else {
-                return { code: -1, message: this.pointer.getChild(name).getName() + ' is a folder', result: null };
+                return { code: -1, message: bin + ": " + name + " is a directory", result: null };
             }
         }
         else {
-            return { code: -1, message: 'file not exist', result: null };
+            return { code: -1, message: bin + ": " + name + ": No such file or directory", result: null };
         }
     };
     VFS.prototype.getPath = function () {
         return this.pointer.getPath();
+    };
+    VFS.prototype.rm = function (name, flag) {
+        var bin = 'rm';
+        if (this.pointer.getChild(name)) {
+            if (flag.indexOf('r') >= 0 || this.pointer.getChild(name).type === 'file') {
+                this.pointer.removeChild(name);
+                return { code: 0, message: '', result: null };
+            }
+            else if (this.pointer.getChild(name).type === 'folder') {
+                return { code: -1, message: bin + ": " + name + ": is a directory", result: null };
+            }
+        }
+        else {
+            return { code: -1, message: bin + ": " + name + ": No such file or directory", result: null };
+        }
     };
     return VFS;
 }());
